@@ -1,0 +1,20 @@
+{
+  "clangd.arguments": [
+    "--compile-commands-dir=build",
+    "--query-driver=@CLANGD_QUERY_DRIVER_GLOB@"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnEdit": false,
+  "cmake.configureOnOpen": false,
+  "cmake.preferredGenerators": ["Ninja"],
+
+  "cortex-debug.armToolchainPath.linux": "/home/lightzero/projects/mcu-env/tools/arm-gnu-toolchain/bin",
+  "cortex-debug.gdbPath.linux": "/home/lightzero/projects/mcu-env/tools/arm-gnu-toolchain/bin/arm-none-eabi-gdb",
+  "cortex-debug.pyocdPath.linux": "/home/lightzero/projects/mcu-env/tools/pyocd/pyocd",
+
+  "cortex-debug.armToolchainPath.windows": "D:/mcu-env/tools/arm-gnu-toolchain/bin",
+  "cortex-debug.gdbPath.windows": "D:/mcu-env/tools/arm-gnu-toolchain/bin/arm-none-eabi-gdb.exe",
+  "cortex-debug.pyocdPath.windows": "D:/mcu-env/tools/pyocd/pyocd.exe"
+}

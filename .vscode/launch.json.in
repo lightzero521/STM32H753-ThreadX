@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (ST-Link pyOCD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/output/@TARGET_NAME@.elf",
+      "servertype": "pyocd",
+      "device": "STM32H753ZI",
+      "targetId": "stm32h743xx",
+      "interface": "swd",
+      "armToolchainPath": "D:/mcu-env/tools/arm-gnu-toolchain/bin",
+      "gdbPath": "D:/mcu-env/tools/arm-gnu-toolchain/bin/arm-none-eabi-gdb.exe",
+      "gdbLaunchTimeout": 20000,
+      "preLaunchCommands": [
+        "set confirm off"
+      ],
+      "runToEntryPoint": "main"
+    }
+  ]
+}

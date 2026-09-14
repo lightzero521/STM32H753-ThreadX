@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Power</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>Power</h1>
+  <p class="chips">
+    <button type="button" id="tab-bq" class="on">BQ25756</button>
+    <button type="button" id="tab-shp" disabled>SHP8808（未实现）</button>
+    <span id="conn"></span>
+  </p>
+
+  <section id="panel-bq">
+    <p>
+      <button type="button" id="btn-chg-on">充电启动</button>
+      <button type="button" id="btn-chg-off">充电停止</button>
+      <button type="button" id="btn-kick">喂狗</button>
+      <button type="button" id="btn-reset">寄存器复位</button>
+      <button type="button" id="btn-clear">清除异常锁存</button>
+    </p>
+    <p id="meta"></p>
+    <div id="chart"></div>
+
+    <fieldset>
+      <legend>状态 / 故障（0x21–0x24）</legend>
+      <div id="regs"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>异常锁存</legend>
+      <p id="latch"></p>
+      <table>
+        <thead><tr><th>t_ms</th><th>源</th><th>bits</th><th>含义</th></tr></thead>
+        <tbody id="log"></tbody>
+      </table>
+    </fieldset>
+
+    <fieldset>
+      <legend>充电参数</legend>
+      <label>VFB mV <input id="fb_mv" type="number" step="2" min="1504" max="1566"></label>
+      <label>ICHG mA <input id="ichg_ma" type="number" min="400" max="20000"></label>
+      <label>IAC lim mA <input id="iac_ma" type="number" min="400" max="20000"></label>
+      <label>VAC DPM mV <input id="vac_mv" type="number" min="4200" max="65000" step="20"></label>
+      <label>IPRE mA <input id="ipre_ma" type="number" min="250" max="10000"></label>
+      <label>ITERM mA <input id="iterm_ma" type="number" min="250" max="10000"></label>
+      <label><input id="en_pre" type="checkbox"> 预充</label>
+      <label><input id="en_term" type="checkbox"> 截止</label>
+      <button type="button" data-cmd="charge_cfg">写入充电参数</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>开关</legend>
+      <label>HiZ <select id="hiz"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="hiz">写入</button>
+      <label>反向 <select id="reverse"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="reverse">写入</button>
+      <label>MPPT <select id="mppt"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="mppt">写入</button>
+      <button type="button" id="btn-sweep">强制扫描</button>
+      <label>PFM <select id="pfm"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="pfm">写入</button>
+      <label>TS <select id="ts"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="ts">写入</button>
+      <label>JEITA <select id="jeita"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-cmd="jeita">写入</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>反向输出</legend>
+      <label>VAC mV <input id="rev_vac_mv" type="number" min="3300" max="65000" step="20"></label>
+      <label>IAC mA <input id="rev_iac_ma" type="number" min="400" max="20000"></label>
+      <label>IBAT_REV
+        <select id="ibat_rev">
+          <option value="0">20A</option><option value="1">15A</option>
+          <option value="2">10A</option><option value="3">5A</option>
+        </select>
+      </label>
+      <label><input id="uvp_3v3" type="checkbox"> UVP 3.3V</label>
+      <button type="button" data-cmd="reverse_cfg">写入反向</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>MPPT / 定时器 / 阈值</legend>
+      <label>扰动
+        <select id="perturb">
+          <option value="0">关</option><option value="1">500ms</option>
+          <option value="2">1s</option><option value="3">10s</option>
+        </select>
+      </label>
+      <label>全扫描
+        <select id="sweep">
+          <option value="0">3min</option><option value="1">10min</option>
+          <option value="2">15min</option><option value="3">20min</option>
+        </select>
+      </label>
+      <button type="button" data-cmd="mppt_cfg">写入 MPPT</button>
+      <label>看门狗
+        <select id="watchdog">
+          <option value="0">关</option><option value="1">40s</option>
+          <option value="2">80s</option><option value="3">160s</option>
+        </select>
+      </label>
+      <button type="button" data-cmd="watchdog">写入看门狗</button>
+      <label>安全定时
+        <select id="safety_timer">
+          <option value="0">5h</option><option value="1">8h</option>
+          <option value="2">12h</option><option value="3">24h</option>
+        </select>
+      </label>
+      <label><input id="safety_en" type="checkbox"> 使能</label>
+      <button type="button" data-cmd="safety">写入安全定时</button>
+      <label>Top-off
+        <select id="topoff">
+          <option value="0">关</option><option value="1">15min</option>
+          <option value="2">30min</option><option value="3">45min</option>
+        </select>
+      </label>
+      <button type="button" data-cmd="topoff">写入 Top-off</button>
+      <label>VBAT_LOWV
+        <select id="vbat_lowv">
+          <option value="0">30%</option><option value="1">55%</option>
+          <option value="2">66.7%</option><option value="3">71.4%</option>
+        </select>
+      </label>
+      <button type="button" data-cmd="vbat_lowv">写入</button>
+      <label>VRECHG
+        <select id="vrechg">
+          <option value="0">93%</option><option value="1">94.3%</option>
+          <option value="2">95.2%</option><option value="3">97.6%</option>
+        </select>
+      </label>
+      <button type="button" data-cmd="vrechg">写入</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>栅极驱动</legend>
+      <label>Buck HS <select id="buck_hs" class="drv"></select></label>
+      <label>Buck LS <select id="buck_ls" class="drv"></select></label>
+      <label>Boost HS <select id="boost_hs" class="drv"></select></label>
+      <label>Boost LS <select id="boost_ls" class="drv"></select></label>
+      <label>Buck DT <select id="buck_dt" class="dt"></select></label>
+      <label>Boost DT <select id="boost_dt" class="dt"></select></label>
+      <button type="button" data-cmd="gate">写入栅极</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>引脚（软件主机通常全关）</legend>
+      <label><input id="pin_ichg" type="checkbox"> ICHG</label>
+      <label><input id="pin_ilim" type="checkbox"> ILIM/HIZ</label>
+      <label><input id="pin_ce" type="checkbox"> CE</label>
+      <label><input id="pin_stat" type="checkbox"> STAT</label>
+      <label><input id="pin_pg" type="checkbox"> PG</label>
+      <button type="button" data-cmd="pins">写入引脚</button>
+    </fieldset>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

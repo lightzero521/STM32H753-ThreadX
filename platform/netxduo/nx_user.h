@@ -1,0 +1,9 @@
+#ifndef NX_USER_H
+#define NX_USER_H
+
+#define NX_DISABLE_IPV6
+#define NX_IP_PERIODIC_RATE 1000
+#define NX_PHYSICAL_HEADER 16
+#define NX_PACKET_ALIGNMENT 32
+
+#endif

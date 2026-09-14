@@ -1,0 +1,49 @@
+[project]
+name = "bringup_STM32H753"
+target = "stm32h750xbh6"
+
+[build]
+build_dir = "build/"
+toolchain_file = "cmake/toolchain-cortex-m7.cmake"
+linker_script = ""
+pre_build = []
+post_build = []
+build_type = "Debug"
+
+[flash]
+tool = "pyocd"
+probe = "stlink"
+after_program = "reset_and_run"
+image = "build/output/bringup_STM32H753.elf"
+
+[flash.jlink]
+device = "STM32H753ZI"
+interface = "swd"
+speed_khz = 4000
+serial = ""
+ip = ""
+reset_strategy = ""
+script = ""
+
+[flash.openocd]
+adapter = "stlink"
+target = "stm32h7x"
+transport = "swd"
+adapter_speed_khz = 0
+extra_commands = ""
+
+[flash.pyocd]
+# pyOCD has no builtin stm32h753zi; H743 is the 2MB-flash sibling.
+target = "stm32h743xx"
+probe_uid = ""
+frequency_hz = 4000000
+connect_mode = "halt"
+pack = ""
+
+[debug]
+probe = "stlink"
+backend = "pyocd"
+on_connect = "reset_halt"
+jlink_device = "STM32H753ZI"
+openocd_interface = "stlink"
+pyocd_target = "stm32h743xx"

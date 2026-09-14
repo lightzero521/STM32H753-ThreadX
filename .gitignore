@@ -1,0 +1,23 @@
+# Build
+build/
+_vendor/
+
+# Firmware artifacts
+*.elf
+*.hex
+*.bin
+*.map
+*.o
+*.obj
+*.a
+
+# IDE / language servers
+.cache/
+.vs/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.idea/
+*.user
+*.suo
+.cursor
