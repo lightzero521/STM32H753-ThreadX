@@ -290,10 +290,8 @@ static int bq_chip_init(uint8_t *part_info)
 
     if (part_info != 0)
         *part_info = 0U;
-    if (bq25756_probe(&charger, &part) != BQ25756_OK) {
-        (void)console_puts("bq: not found");
+    if (bq25756_probe(&charger, &part) != BQ25756_OK)
         return -1;
-    }
     if (part_info != 0)
         *part_info = part;
 
@@ -316,10 +314,8 @@ static int shp_chip_init(uint8_t *option0)
 
     if (option0 != 0)
         *option0 = 0U;
-    if (shp8808_probe(&shp, &value) != SHP8808_OK) {
-        (void)console_puts("shp: probe failed");
+    if (shp8808_probe(&shp, &value) != SHP8808_OK)
         return -1;
-    }
     if (option0 != 0)
         *option0 = value;
     if (shp8808_configure_software_host(&shp) != SHP8808_OK ||
@@ -699,44 +695,60 @@ static void power_thread_entry(ULONG arg)
 {
     uint8_t option0 = 0U;
     uint8_t part_info = 0U;
+    uint8_t waiting = 0U;
 
     (void)arg;
     if (board_i2c_open() != 0) {
         (void)console_puts("pwr: i2c open failed");
         return;
     }
-    while (shp_chip_init(&option0) != 0) {
-        (void)console_puts("shp: init failed, retry");
+    power_ready = 1U;
+
+    while (!shp_snap.present && !snap.present) {
+        if (shp_chip_init(&option0) == 0) {
+            (void)tx_mutex_get(&power_lock, TX_WAIT_FOREVER);
+            shp_snap.present = true;
+            shp_snap.option0 = option0;
+            (void)shp_refresh_locked();
+            (void)tx_mutex_put(&power_lock);
+        }
+        if (bq_chip_init(&part_info) == 0) {
+            (void)tx_mutex_get(&power_lock, TX_WAIT_FOREVER);
+            snap.present = true;
+            snap.part = part_info;
+            (void)refresh_locked();
+            (void)tx_mutex_put(&power_lock);
+        }
+        if (shp_snap.present || snap.present)
+            break;
+        if (waiting == 0U) {
+            waiting = 1U;
+            (void)console_puts("pwr: waiting SHP8808 0x6C or BQ25756 0x6B");
+        }
         tx_thread_sleep(1000U);
     }
-    if (bq_chip_init(&part_info) == 0)
-        snap.present = true;
-
-    (void)tx_mutex_get(&power_lock, TX_WAIT_FOREVER);
-    shp_snap.present = true;
-    shp_snap.option0 = option0;
-    if (snap.present) {
-        snap.part = part_info;
-        (void)refresh_locked();
-    }
-    power_ready = 1U;
-    (void)shp_refresh_locked();
-    (void)tx_mutex_put(&power_lock);
 
     for (;;) {
         (void)tx_mutex_get(&power_lock, TX_WAIT_FOREVER);
-        if (shp_refresh_locked() != 0)
+        if (shp_snap.present && shp_refresh_locked() != 0)
             (void)console_puts("shp: read failed");
         if (snap.present && refresh_locked() != 0)
             (void)console_puts("bq: read failed");
         if (++shp_print_div >= BOARD_CHARGER_SAMPLE_HZ) {
             shp_print_div = 0U;
-            (void)console_print("shp: VBUS %lu mV VBAT %lu mV IBUS %d mA IBAT %d mA %s chg %u adc 0x%x\r\n",
-                                (unsigned long)shp_snap.adc.input_voltage_mv,
-                                (unsigned long)shp_snap.adc.battery_voltage_mv, (int)shp_snap.adc.input_current_ma,
-                                (int)shp_snap.adc.battery_current_ma,
-                                shp8808_charge_phase_name(shp_snap.decoded.charge),
-                                shp_snap.charge_en ? 1U : 0U, (unsigned)shp_snap.adc_control);
+            if (shp_snap.present)
+                (void)console_print("shp: VBUS %lu mV VBAT %lu mV IBUS %d mA IBAT %d mA %s chg %u adc 0x%x\r\n",
+                                    (unsigned long)shp_snap.adc.input_voltage_mv,
+                                    (unsigned long)shp_snap.adc.battery_voltage_mv, (int)shp_snap.adc.input_current_ma,
+                                    (int)shp_snap.adc.battery_current_ma,
+                                    shp8808_charge_phase_name(shp_snap.decoded.charge),
+                                    shp_snap.charge_en ? 1U : 0U, (unsigned)shp_snap.adc_control);
+            else if (snap.present)
+                (void)console_print("bq: VAC %lu mV VBAT %lu mV IAC %d mA IBAT %d mA %s chg %u\r\n",
+                                    (unsigned long)snap.adc.input_voltage_mv,
+                                    (unsigned long)snap.adc.battery_voltage_mv,
+                                    (int)(snap.adc.input_current_ma_x10 / 10), (int)snap.adc.battery_current_ma,
+                                    bq25756_charge_phase_name(snap.decoded.charge), snap.charge_en ? 1U : 0U);
         }
         (void)tx_mutex_put(&power_lock);
         tx_thread_sleep((ULONG)POWER_SAMPLE_PERIOD_MS);

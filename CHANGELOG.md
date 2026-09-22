@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Power 启动改为自动探测 SHP8808（0x6C）或 BQ25756（0x6B），任一在总线即可，不再卡住 SHP
+
 ## 0.1.3
 
 - Power 模块接入 SHP8808 bring-up：I2C1 PB8/PB9（CN7 I2C_A）探测 0x6C，软主机、ADC 连续采样（不置 ADC_START）、充电默认关

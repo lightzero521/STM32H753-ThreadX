@@ -24,7 +24,7 @@ void tx_application_define(void *first_unused_memory)
     (void)console_print("board NUCLEO-H753ZI, sysclk %u Hz, USART3 PD8/PD9 %u baud, LD1 2 Hz, I-cache on/D-cache off, no MPU\r\n",
                         system_core_clock_hz(), BOARD_CONSOLE_BAUD);
     (void)console_print("build %s\r\n", system_build_time());
-    (void)console_puts("pwr I2C1 PB8/PB9 SHP8808 0x6C, eth RMII LAN8742 + NetX Duo HTTP :80");
+    (void)console_puts("pwr I2C1 PB8/PB9 SHP8808 0x6C or BQ25756 0x6B, eth RMII LAN8742 + NetX Duo HTTP :80");
 
     if (led_module_start() != 0)
         (void)console_puts("led module start failed");

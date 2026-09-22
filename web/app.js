@@ -346,6 +346,23 @@ async function tick() {
   return tickBq();
 }
 
+async function pickChip() {
+  try {
+    const shp = await fetch("/api/shp8808").then((r) => r.json());
+    if (shp.present) {
+      switchChip("shp");
+      return;
+    }
+  } catch (e) {}
+  try {
+    const bq = await fetch("/api/bq25756").then((r) => r.json());
+    if (bq.present) {
+      switchChip("bq");
+      return;
+    }
+  } catch (e) {}
+}
+
 function bind() {
   document.querySelectorAll(".drv").forEach((el) => fillSelect(el, ["最快", "较快", "较慢", "最慢"]));
   document.querySelectorAll(".dt").forEach((el) => fillSelect(el, ["45ns", "75ns", "105ns", "135ns"]));
@@ -381,8 +398,10 @@ function bind() {
       });
     };
   });
-  setInterval(tick, 500);
-  tick();
+  pickChip().finally(() => {
+    setInterval(tick, 500);
+    tick();
+  });
 }
 
 bind();
