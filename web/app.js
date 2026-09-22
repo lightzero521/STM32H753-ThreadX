@@ -7,11 +7,19 @@ const F2 = ["MPPT", "b1", "b2", "TS", "b4", "b5", "b6", "PG"];
 const FF = FAULT;
 const KIND = ["FAULT 0x24", "FLAG1 0x25", "FLAG2 0x26", "FAULT_FLAG 0x27"];
 const KIND_BITS = [FAULT, F1, F2, FF];
+const S0_SHP = ["b0", "IL_CLP", "VBATOV", "VBUSOV", "VBUS", "PG", "VINDPM", "IBUSREG"];
+const S1_SHP = ["OTG_UVP", "OTG_OVP", "TRICKLE_TMR", "PRECHG_TMR", "FAST_TMR", "CHG0", "CHG1", "CHG2"];
+const S2_SHP = ["SYNC", "AUTO_REV", "MPPT0", "MPPT1", "TS_HOT", "TS_WARM", "TS_COOL", "TS_COLD"];
+const KIND_SHP = ["STATUS0 0x20", "STATUS1 0x21", "STATUS2 0x22"];
+const KIND_BITS_SHP = [S0_SHP, S1_SHP, S2_SHP];
 
 const hist = { t: [], vac: [], vbat: [], iac: [], ibat: [] };
+const shpHist = { t: [], vac: [], vbat: [], iac: [], ibat: [] };
 const MAX_PT = 60;
 let chart;
+let shpChart;
 let skipFill = false;
+let chip = "shp";
 
 function bits(val, names) {
   const out = [];
@@ -41,43 +49,43 @@ function setVal(id, v, isCheck) {
   else el.value = String(v);
 }
 
-async function api(body) {
+async function api(body, path) {
   const opt = body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { method: "GET" };
-  const r = await fetch("/api/bq25756", opt);
+  const r = await fetch(path || (chip === "shp" ? "/api/shp8808" : "/api/bq25756"), opt);
   return r.json();
 }
 
-function pushHist(s) {
+function pushHist(s, h, chartObj, names) {
   const t = (s.uptime_ms / 1000).toFixed(1);
-  hist.t.push(t);
-  hist.vac.push(s.adc.vac_mv / 1000);
-  hist.vbat.push(s.adc.vbat_mv / 1000);
-  hist.iac.push(s.adc.iac_x10 / 10000);
-  hist.ibat.push(s.adc.ibat_ma / 1000);
-  if (hist.t.length > MAX_PT) {
-    hist.t.shift();
-    hist.vac.shift();
-    hist.vbat.shift();
-    hist.iac.shift();
-    hist.ibat.shift();
+  h.t.push(t);
+  h.vac.push((s.adc.vac_mv != null ? s.adc.vac_mv : s.adc.vbus_mv) / 1000);
+  h.vbat.push((s.adc.vbat_mv) / 1000);
+  h.iac.push(s.adc.iac_x10 != null ? s.adc.iac_x10 / 10000 : s.adc.ibus_ma / 1000);
+  h.ibat.push(s.adc.ibat_ma / 1000);
+  if (h.t.length > MAX_PT) {
+    h.t.shift();
+    h.vac.shift();
+    h.vbat.shift();
+    h.iac.shift();
+    h.ibat.shift();
   }
-  if (!chart) return;
-  chart.setOption({
+  if (!chartObj) return;
+  chartObj.setOption({
     animation: false,
     grid: { left: 48, right: 48, top: 24, bottom: 28 },
-    legend: { data: ["VAC", "VBAT", "IAC", "IBAT"] },
-    xAxis: { type: "category", data: hist.t, boundaryGap: false },
+    legend: { data: names },
+    xAxis: { type: "category", data: h.t, boundaryGap: false },
     yAxis: [
       { type: "value", name: "V", min: 0 },
       { type: "value", name: "A" }
     ],
     series: [
-      { name: "VAC", type: "line", showSymbol: false, data: hist.vac },
-      { name: "VBAT", type: "line", showSymbol: false, data: hist.vbat },
-      { name: "IAC", type: "line", yAxisIndex: 1, showSymbol: false, data: hist.iac },
-      { name: "IBAT", type: "line", yAxisIndex: 1, showSymbol: false, data: hist.ibat }
+      { name: names[0], type: "line", showSymbol: false, data: h.vac },
+      { name: names[1], type: "line", showSymbol: false, data: h.vbat },
+      { name: names[2], type: "line", yAxisIndex: 1, showSymbol: false, data: h.iac },
+      { name: names[3], type: "line", yAxisIndex: 1, showSymbol: false, data: h.ibat }
     ]
   });
 }
@@ -186,9 +194,9 @@ function payload(cmd) {
   return { cmd };
 }
 
-async function tick() {
+async function tickBq() {
   try {
-    const s = await api(null);
+    const s = await api(null, "/api/bq25756");
     const conn = document.getElementById("conn");
     if (!s.present) {
       conn.textContent = "BQ25756 未连接";
@@ -202,27 +210,173 @@ async function tick() {
     renderRegs(s);
     renderLatch(s);
     fillForm(s);
-    pushHist(s);
+    pushHist(s, hist, chart, ["VAC", "VBAT", "IAC", "IBAT"]);
   } catch (e) {
     document.getElementById("conn").textContent = "HTTP 失败";
     document.getElementById("conn").className = "bad";
   }
 }
 
+function renderShpRegs(s) {
+  const r = s.raw;
+  const d = s.decoded;
+  document.getElementById("shp-regs").innerHTML =
+    `<p class="bits">STATUS0 ${hex2(r.s0)} ${bits(r.s0, S0_SHP)} · PG ${d.pg | 0} VBUS ${d.vbus | 0}` +
+    ` VINDPM ${d.vindpm | 0} IBUSREG ${d.ibus_reg | 0} OV ${d.vbus_ov | 0}/${d.vbat_ov | 0}</p>` +
+    `<p class="bits">STATUS1 ${hex2(r.s1)} ${bits(r.s1, S1_SHP)} · ${d.charge}` +
+    ` OTG_OV ${d.otg_ov | 0} OTG_UV ${d.otg_uv | 0} SAFETY ${d.safety | 0}</p>` +
+    `<p class="bits">STATUS2 ${hex2(r.s2)} ${bits(r.s2, S2_SHP)} · TS ${d.ts} MPPT ${d.mppt} REV ${d.reverse | 0}</p>`;
+}
+
+function renderShpLatch(s) {
+  const l = s.latch;
+  document.getElementById("shp-latch").textContent =
+    `S0 ${hex2(l.s0)} ${bits(l.s0, S0_SHP)} | S1 ${hex2(l.s1)} ${bits(l.s1, S1_SHP)} | S2 ${hex2(l.s2)} ${bits(l.s2, S2_SHP)}`;
+  const tb = document.getElementById("shp-log");
+  tb.innerHTML = (s.log || []).slice().reverse().map((e) => {
+    const names = KIND_BITS_SHP[e.kind] || S0_SHP;
+    return `<tr><td>${e.t}</td><td>${KIND_SHP[e.kind] || e.kind}</td><td>${hex2(e.bits)}</td><td>${bits(e.bits, names)}</td></tr>`;
+  }).join("");
+}
+
+function fillShpForm(s) {
+  if (busyInput() || skipFill) return;
+  const c = s.cfg;
+  setVal("shp_fb_mv", c.fb_mv);
+  setVal("shp_ichg_ma", c.ichg_ma);
+  setVal("shp_iac_ma", c.iac_ma);
+  setVal("shp_vindpm_mv", c.vindpm_mv);
+  setVal("shp_ipre_ma", c.ipre_ma);
+  setVal("shp_iterm_ma", c.iterm_ma);
+  setVal("shp_en_pre", c.en_pre, true);
+  setVal("shp_en_term", c.en_term, true);
+  setVal("shp_en_float", c.en_float, true);
+  setVal("shp_hiz", s.ctrl.hiz ? 1 : 0);
+  setVal("shp_reverse", s.ctrl.reverse ? 1 : 0);
+  setVal("shp_mppt", s.ctrl.mppt ? 1 : 0);
+  setVal("shp_pfm", s.ctrl.pfm ? 1 : 0);
+  setVal("shp_ts", s.ctrl.ts ? 1 : 0);
+  setVal("shp_jeita", s.ctrl.jeita ? 1 : 0);
+  setVal("shp_rev_vbus_mv", s.rev.vbus_mv);
+  setVal("shp_rev_ibus_ma", s.rev.ibus_ma);
+  setVal("shp_rev_fb", s.rev.fb_pin, true);
+  setVal("shp_perturb", s.mppt.perturb);
+  setVal("shp_sweep", s.mppt.sweep);
+  setVal("shp_step", s.mppt.step);
+  setVal("shp_safety_timer", s.tmr.safety);
+  setVal("shp_safety_en", s.tmr.safety_en, true);
+  setVal("shp_pre_timer", s.tmr.pre);
+  setVal("shp_pre_en", s.tmr.pre_en, true);
+  setVal("shp_vbat_lowv", s.tmr.vbat_lowv);
+  setVal("shp_vrechg", s.tmr.vrechg);
+  setVal("shp_vfloat", s.tmr.vfloat);
+  setVal("shp_pin_ibus", s.pins.ibus, true);
+  setVal("shp_pin_ibat", s.pins.ibat, true);
+  setVal("shp_pin_otg_fb", s.pins.otg_fb, true);
+}
+
+function shpPayload(cmd) {
+  const n = (id) => Number(document.getElementById(id).value);
+  const c = (id) => document.getElementById(id).checked;
+  const s = (id) => document.getElementById(id).value === "1";
+  if (cmd === "hiz" || cmd === "reverse" || cmd === "mppt" || cmd === "pfm" || cmd === "ts" || cmd === "jeita")
+    return { cmd, on: s("shp_" + cmd) };
+  if (cmd === "charge_cfg")
+    return {
+      cmd, fb_mv: n("shp_fb_mv"), ichg_ma: n("shp_ichg_ma"), iac_ma: n("shp_iac_ma"),
+      vindpm_mv: n("shp_vindpm_mv"), ipre_ma: n("shp_ipre_ma"), iterm_ma: n("shp_iterm_ma"),
+      en_pre: c("shp_en_pre"), en_term: c("shp_en_term"), en_float: c("shp_en_float")
+    };
+  if (cmd === "reverse_cfg")
+    return { cmd, vbus_mv: n("shp_rev_vbus_mv"), ibus_ma: n("shp_rev_ibus_ma"), fb_pin: c("shp_rev_fb") };
+  if (cmd === "mppt_cfg")
+    return { cmd, perturb: n("shp_perturb"), sweep: n("shp_sweep"), step: n("shp_step") };
+  if (cmd === "safety")
+    return { cmd, timer: n("shp_safety_timer"), on: c("shp_safety_en") };
+  if (cmd === "precharge_tmr")
+    return { cmd, timer: n("shp_pre_timer"), on: c("shp_pre_en") };
+  if (cmd === "vbat_lowv")
+    return { cmd, v: n("shp_vbat_lowv") };
+  if (cmd === "vrechg")
+    return { cmd, v: n("shp_vrechg") };
+  if (cmd === "vfloat")
+    return { cmd, v: n("shp_vfloat") };
+  if (cmd === "pins")
+    return { cmd, ibus: c("shp_pin_ibus"), ibat: c("shp_pin_ibat"), otg_fb: c("shp_pin_otg_fb") };
+  return { cmd };
+}
+
+async function tickShp() {
+  try {
+    const s = await api(null, "/api/shp8808");
+    const conn = document.getElementById("conn");
+    if (!s.present) {
+      conn.textContent = "SHP8808 未连接";
+      conn.className = "bad";
+      return;
+    }
+    conn.textContent = "option0 0x" + s.option0.toString(16) + " 充电 " + (s.ctrl.charge ? "开" : "关");
+    conn.className = (s.raw.s0 & 0x0e) || s.latch.s0 & 0x0e ? "bad" : "ok";
+    document.getElementById("shp-meta").textContent =
+      `VBUS ${s.adc.vbus_mv} mV  VBAT ${s.adc.vbat_mv} mV  IBUS ${s.adc.ibus_ma} mA  IBAT ${s.adc.ibat_ma} mA  IOTG ${s.adc.iotg_ma} mA`;
+    renderShpRegs(s);
+    renderShpLatch(s);
+    fillShpForm(s);
+    pushHist(s, shpHist, shpChart, ["VBUS", "VBAT", "IBUS", "IBAT"]);
+  } catch (e) {
+    document.getElementById("conn").textContent = "HTTP 失败";
+    document.getElementById("conn").className = "bad";
+  }
+}
+
+function switchChip(name) {
+  chip = name;
+  document.getElementById("tab-shp").classList.toggle("on", name === "shp");
+  document.getElementById("tab-bq").classList.toggle("on", name === "bq");
+  document.getElementById("panel-shp").classList.toggle("on", name === "shp");
+  document.getElementById("panel-bq").classList.toggle("on", name === "bq");
+  if (name === "shp" && shpChart) shpChart.resize();
+  if (name === "bq" && chart) chart.resize();
+  tick();
+}
+
+async function tick() {
+  if (chip === "shp")
+    return tickShp();
+  return tickBq();
+}
+
 function bind() {
   document.querySelectorAll(".drv").forEach((el) => fillSelect(el, ["最快", "较快", "较慢", "最慢"]));
   document.querySelectorAll(".dt").forEach((el) => fillSelect(el, ["45ns", "75ns", "105ns", "135ns"]));
-  if (window.echarts) chart = echarts.init(document.getElementById("chart"));
-  document.getElementById("btn-chg-on").onclick = () => api({ cmd: "charge", on: true });
-  document.getElementById("btn-chg-off").onclick = () => api({ cmd: "charge", on: false });
-  document.getElementById("btn-kick").onclick = () => api({ cmd: "kick" });
-  document.getElementById("btn-reset").onclick = () => api({ cmd: "reset" });
-  document.getElementById("btn-clear").onclick = () => api({ cmd: "clear_latch" });
-  document.getElementById("btn-sweep").onclick = () => api({ cmd: "mppt_sweep" });
+  if (window.echarts) {
+    chart = echarts.init(document.getElementById("chart"));
+    shpChart = echarts.init(document.getElementById("shp-chart"));
+  }
+  document.getElementById("tab-shp").onclick = () => switchChip("shp");
+  document.getElementById("tab-bq").onclick = () => switchChip("bq");
+  document.getElementById("btn-chg-on").onclick = () => api({ cmd: "charge", on: true }, "/api/bq25756");
+  document.getElementById("btn-chg-off").onclick = () => api({ cmd: "charge", on: false }, "/api/bq25756");
+  document.getElementById("btn-kick").onclick = () => api({ cmd: "kick" }, "/api/bq25756");
+  document.getElementById("btn-reset").onclick = () => api({ cmd: "reset" }, "/api/bq25756");
+  document.getElementById("btn-clear").onclick = () => api({ cmd: "clear_latch" }, "/api/bq25756");
+  document.getElementById("btn-sweep").onclick = () => api({ cmd: "mppt_sweep" }, "/api/bq25756");
   document.querySelectorAll("button[data-cmd]").forEach((btn) => {
     btn.onclick = () => {
       skipFill = true;
-      api(payload(btn.getAttribute("data-cmd"))).finally(() => {
+      api(payload(btn.getAttribute("data-cmd")), "/api/bq25756").finally(() => {
+        setTimeout(() => { skipFill = false; }, 800);
+      });
+    };
+  });
+  document.getElementById("shp-chg-on").onclick = () => api({ cmd: "charge", on: true }, "/api/shp8808");
+  document.getElementById("shp-chg-off").onclick = () => api({ cmd: "charge", on: false }, "/api/shp8808");
+  document.getElementById("shp-reset").onclick = () => api({ cmd: "reset" }, "/api/shp8808");
+  document.getElementById("shp-clear").onclick = () => api({ cmd: "clear_latch" }, "/api/shp8808");
+  document.querySelectorAll("button[data-shp-cmd]").forEach((btn) => {
+    btn.onclick = () => {
+      skipFill = true;
+      api(shpPayload(btn.getAttribute("data-shp-cmd")), "/api/shp8808").finally(() => {
         setTimeout(() => { skipFill = false; }, 800);
       });
     };

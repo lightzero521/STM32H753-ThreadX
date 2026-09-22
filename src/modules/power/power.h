@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "modules/power/bq25756/bq25756.h"
+#include "modules/power/shp8808/shp8808.h"
 
 #define POWER_FAULT_LOG_MAX 16U
 
@@ -46,8 +47,43 @@ typedef struct {
     power_fault_event log[POWER_FAULT_LOG_MAX];
 } power_bq_snapshot;
 
+typedef struct {
+    bool present;
+    uint8_t option0;
+    uint8_t adc_control;
+    uint32_t uptime_ms;
+    shp8808_adc_values adc;
+    shp8808_status_snapshot raw;
+    shp8808_status_decoded decoded;
+    bool charge_en;
+    bool hiz;
+    bool reverse_en;
+    bool mppt_en;
+    bool pfm;
+    bool ts_en;
+    bool jeita_en;
+    uint8_t safety_timer;
+    bool safety_en;
+    uint8_t precharge_timer;
+    bool precharge_timer_en;
+    uint8_t vbat_lowv;
+    uint8_t vrechg;
+    uint8_t vfloat;
+    shp8808_charge_config charge;
+    shp8808_reverse_config reverse;
+    shp8808_mppt_config mppt;
+    shp8808_pin_config pins;
+    uint8_t latch0;
+    uint8_t latch1;
+    uint8_t latch2;
+    uint8_t log_count;
+    power_fault_event log[POWER_FAULT_LOG_MAX];
+} power_shp_snapshot;
+
 int power_module_start(void);
 int power_bq_copy_snapshot(power_bq_snapshot *out);
 int power_bq_command(const char *json, uint32_t json_len);
+int power_shp_copy_snapshot(power_shp_snapshot *out);
+int power_shp_command(const char *json, uint32_t json_len);
 
 #endif

@@ -8,7 +8,8 @@
  * Cache: I-Cache on, D-Cache off, no MPU (DMA stays coherent without D-Cache).
  * Console: USART3 PD8/PD9 AF7, ST-LINK VCP, 460800 baud.
  * LEDs: LD1 PB0 green, LD2 PE1 yellow, LD3 PB14 red, push-pull active high.
- * Charger: I2C1 PB8/PB9 AF4 (Arduino D15/D14), BQ25756 7-bit 0x6B, fly-wire + pull-ups.
+ * Charger: I2C1 PB8/PB9 AF4 (CN7 I2C_A / Arduino D15/D14).
+ * SHP8808 7-bit 0x6C (IBUS 2 mΩ, IBAT 5 mΩ). BQ25756 0x6B optional if present.
  * ETH: LAN8742A RMII.
  */
 
@@ -19,6 +20,8 @@
 
 #define BOARD_CHARGER_I2C_HZ 100000U
 #define BOARD_CHARGER_SENSE_MOHM 5U
+#define BOARD_SHP_IBUS_SENSE_MOHM 2U
+#define BOARD_SHP_IBAT_SENSE_MOHM 5U
 #define BOARD_CHARGER_SAMPLE_HZ 5U
 
 #define BOARD_NET_STATIC_IP 0xC0A80150UL /* 192.168.1.80 */

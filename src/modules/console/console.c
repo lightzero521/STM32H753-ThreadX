@@ -95,10 +95,26 @@ int console_print(const char *fmt, ...)
             continue;
         }
         ++p;
-        if (*p == 'l' && p[1] == 'u') {
+        if (*p == 'l' && (p[1] == 'u' || p[1] == 'd')) {
+            char spec = p[1];
             ++p;
-            if (emit_uint((uint32_t)va_arg(args, unsigned long), 10U) < 0)
-                goto done;
+            if (spec == 'u') {
+                if (emit_uint((uint32_t)va_arg(args, unsigned long), 10U) < 0)
+                    goto done;
+            } else {
+                long v = va_arg(args, long);
+                uint32_t mag;
+                if (v < 0) {
+                    char minus = '-';
+                    if (emit(&minus, 1U) < 0)
+                        goto done;
+                    mag = 0U - (uint32_t)v;
+                } else {
+                    mag = (uint32_t)v;
+                }
+                if (emit_uint(mag, 10U) < 0)
+                    goto done;
+            }
         } else if (*p == 'd') {
             int v = va_arg(args, int);
             uint32_t mag;

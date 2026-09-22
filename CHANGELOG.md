@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- Power 模块接入 SHP8808 bring-up：I2C1 PB8/PB9（CN7 I2C_A）探测 0x6C，软主机、ADC 连续采样（不置 ADC_START）、充电默认关
+- 串口 1 Hz 打印 VBUS/VBAT/IBUS/IBAT 和 ADC `0x1A`；HTTP `GET/POST /api/shp8808`，调试台默认 SHP8808 页签
+- BQ25756 仍可选：总线上有 0x6B 才启用，不再阻塞启动
+- `console_print` 增加 `%ld`
+
 ## 0.1.2
 
 - 新增 SHP8808 驱动库（`src/modules/power/shp8808/`），I2C 地址 0x6C，风格对齐 BQ25756；Web 页签仍预留

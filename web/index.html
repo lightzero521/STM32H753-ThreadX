@@ -9,12 +9,12 @@
 <body>
   <h1>Power</h1>
   <p class="chips">
-    <button type="button" id="tab-bq" class="on">BQ25756</button>
-    <button type="button" id="tab-shp" disabled>SHP8808（未实现）</button>
+    <button type="button" id="tab-shp" class="on">SHP8808</button>
+    <button type="button" id="tab-bq">BQ25756</button>
     <span id="conn"></span>
   </p>
 
-  <section id="panel-bq">
+  <section id="panel-bq" class="panel">
     <p>
       <button type="button" id="btn-chg-on">充电启动</button>
       <button type="button" id="btn-chg-off">充电停止</button>
@@ -155,6 +155,136 @@
       <label><input id="pin_stat" type="checkbox"> STAT</label>
       <label><input id="pin_pg" type="checkbox"> PG</label>
       <button type="button" data-cmd="pins">写入引脚</button>
+    </fieldset>
+  </section>
+
+  <section id="panel-shp" class="panel on">
+    <p>
+      <button type="button" id="shp-chg-on">充电启动</button>
+      <button type="button" id="shp-chg-off">充电停止</button>
+      <button type="button" id="shp-reset">寄存器复位</button>
+      <button type="button" id="shp-clear">清除异常锁存</button>
+    </p>
+    <p id="shp-meta"></p>
+    <div id="shp-chart"></div>
+
+    <fieldset>
+      <legend>状态 / 故障（0x20–0x22）</legend>
+      <div id="shp-regs"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>异常锁存</legend>
+      <p id="shp-latch"></p>
+      <table>
+        <thead><tr><th>t_ms</th><th>源</th><th>bits</th><th>含义</th></tr></thead>
+        <tbody id="shp-log"></tbody>
+      </table>
+    </fieldset>
+
+    <fieldset>
+      <legend>充电参数</legend>
+      <label>VFB mV <input id="shp_fb_mv" type="number" step="2" min="1504" max="1566"></label>
+      <label>ICHG mA <input id="shp_ichg_ma" type="number" min="1000" max="20000" step="100"></label>
+      <label>IINDPM mA <input id="shp_iac_ma" type="number" min="2375" max="50000" step="375"></label>
+      <label>VINDPM ref mV <input id="shp_vindpm_mv" type="number" min="100" max="1123"></label>
+      <label>IPRE mA <input id="shp_ipre_ma" type="number" min="400" max="10000" step="100"></label>
+      <label>ITERM mA <input id="shp_iterm_ma" type="number" min="400" max="6700" step="100"></label>
+      <label><input id="shp_en_pre" type="checkbox"> 预充</label>
+      <label><input id="shp_en_term" type="checkbox"> 截止</label>
+      <label><input id="shp_en_float" type="checkbox"> 浮充</label>
+      <button type="button" data-shp-cmd="charge_cfg">写入充电参数</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>开关</legend>
+      <label>HiZ/DIS_DCDC <select id="shp_hiz"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="hiz">写入</button>
+      <label>反向/OTG <select id="shp_reverse"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="reverse">写入</button>
+      <label>MPPT <select id="shp_mppt"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="mppt">写入</button>
+      <label>PFM <select id="shp_pfm"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="pfm">写入</button>
+      <label>TS <select id="shp_ts"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="ts">写入</button>
+      <label>JEITA <select id="shp_jeita"><option value="0">关</option><option value="1">开</option></select></label>
+      <button type="button" data-shp-cmd="jeita">写入</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>反向 / OTG</legend>
+      <label>VBUS mV <input id="shp_rev_vbus_mv" type="number" min="5000" max="48000" step="20"></label>
+      <label>IBUS mA <input id="shp_rev_ibus_ma" type="number" min="2375" max="50000" step="375"></label>
+      <label><input id="shp_rev_fb" type="checkbox"> OTG 外部分压</label>
+      <button type="button" data-shp-cmd="reverse_cfg">写入反向</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>MPPT / 定时器 / 阈值</legend>
+      <label>扰动
+        <select id="shp_perturb">
+          <option value="0">62.5ms</option><option value="1">125ms</option>
+          <option value="2">1.25s</option><option value="3">关</option>
+        </select>
+      </label>
+      <label>全扫描
+        <select id="shp_sweep">
+          <option value="0">5min</option><option value="1">10min</option>
+          <option value="2">15min</option><option value="3">关</option>
+        </select>
+      </label>
+      <label>步进
+        <select id="shp_step">
+          <option value="0">1x</option><option value="1">2x</option>
+          <option value="2">4x</option><option value="3">8x</option>
+        </select>
+      </label>
+      <button type="button" data-shp-cmd="mppt_cfg">写入 MPPT</button>
+      <label>安全定时
+        <select id="shp_safety_timer">
+          <option value="0">5h</option><option value="1">8h</option>
+          <option value="2">12h</option><option value="3">24h</option>
+        </select>
+      </label>
+      <label><input id="shp_safety_en" type="checkbox"> 使能</label>
+      <button type="button" data-shp-cmd="safety">写入安全定时</button>
+      <label>预充定时
+        <select id="shp_pre_timer">
+          <option value="0">2h</option><option value="1">1h</option>
+        </select>
+      </label>
+      <label><input id="shp_pre_en" type="checkbox"> 使能</label>
+      <button type="button" data-shp-cmd="precharge_tmr">写入预充定时</button>
+      <label>VBAT_LOWV
+        <select id="shp_vbat_lowv">
+          <option value="0">30%</option><option value="1">55%</option>
+          <option value="2">66.7%</option><option value="3">71.4%</option>
+        </select>
+      </label>
+      <button type="button" data-shp-cmd="vbat_lowv">写入</button>
+      <label>VRECHG
+        <select id="shp_vrechg">
+          <option value="0">93%</option><option value="1">94.5%</option>
+          <option value="2">95%</option><option value="3">97.5%</option>
+        </select>
+      </label>
+      <button type="button" data-shp-cmd="vrechg">写入</button>
+      <label>VFLOAT
+        <select id="shp_vfloat">
+          <option value="0">90.5%</option><option value="1">93%</option>
+          <option value="2">94.5%</option><option value="3">95%</option>
+        </select>
+      </label>
+      <button type="button" data-shp-cmd="vfloat">写入</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>引脚（软件主机通常全关=内部寄存器）</legend>
+      <label><input id="shp_pin_ibus" type="checkbox"> IBUS_SET</label>
+      <label><input id="shp_pin_ibat" type="checkbox"> IBAT_SET</label>
+      <label><input id="shp_pin_otg_fb" type="checkbox"> OTG_FB</label>
+      <button type="button" data-shp-cmd="pins">写入引脚</button>
     </fieldset>
   </section>
 

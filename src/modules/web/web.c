@@ -20,7 +20,7 @@
 #define NX_ARP_CACHE_SIZE 1024U
 #define NX_HTTP_WINDOW 2048U
 #define HTTP_REQ_MAX 1536U
-#define JSON_MAX 2048U
+#define JSON_MAX 2560U
 
 static TX_THREAD web_thread;
 static ULONG web_thread_stack[WEB_THREAD_STACK_SIZE / sizeof(ULONG)];
@@ -169,6 +169,62 @@ static int bq_json_fill(char *buf, uint32_t cap)
     return n;
 }
 
+static int shp_json_fill(char *buf, uint32_t cap)
+{
+    power_shp_snapshot s;
+    int n;
+    uint8_t i;
+
+    (void)power_shp_copy_snapshot(&s);
+    n = snprintf(
+        buf, cap,
+        "{\"present\":%s,\"option0\":%u,\"uptime_ms\":%lu,"
+        "\"adc\":{\"vbus_mv\":%lu,\"vbat_mv\":%lu,\"ibus_ma\":%d,\"iotg_ma\":%d,\"ibat_ma\":%d,\"ts\":%u},"
+        "\"raw\":{\"s0\":%u,\"s1\":%u,\"s2\":%u},"
+        "\"decoded\":{\"charge\":\"%s\",\"ts\":\"%s\",\"mppt\":\"%s\",\"ibus_reg\":%s,\"vindpm\":%s,\"pg\":%s,"
+        "\"vbus\":%s,\"vbus_ov\":%s,\"vbat_ov\":%s,\"il_clamp\":%s,\"reverse\":%s,\"sync\":%s,\"otg_ov\":%s,"
+        "\"otg_uv\":%s,\"safety\":%s},"
+        "\"ctrl\":{\"charge\":%s,\"hiz\":%s,\"reverse\":%s,\"mppt\":%s,\"pfm\":%s,\"ts\":%s,\"jeita\":%s},"
+        "\"cfg\":{\"fb_mv\":%u,\"ichg_ma\":%lu,\"iac_ma\":%lu,\"vindpm_mv\":%u,\"ipre_ma\":%lu,\"iterm_ma\":%lu,"
+        "\"en_pre\":%s,\"en_term\":%s,\"en_float\":%s},"
+        "\"rev\":{\"vbus_mv\":%lu,\"ibus_ma\":%lu,\"fb_pin\":%s},"
+        "\"mppt\":{\"perturb\":%u,\"sweep\":%u,\"step\":%u},"
+        "\"tmr\":{\"safety\":%u,\"safety_en\":%s,\"pre\":%u,\"pre_en\":%s,\"vbat_lowv\":%u,\"vrechg\":%u,\"vfloat\":%u},"
+        "\"pins\":{\"ibus\":%s,\"ibat\":%s,\"otg_fb\":%s},"
+        "\"latch\":{\"s0\":%u,\"s1\":%u,\"s2\":%u},\"log\":[",
+        jb(s.present), s.option0, (unsigned long)s.uptime_ms, (unsigned long)s.adc.input_voltage_mv,
+        (unsigned long)s.adc.battery_voltage_mv, (int)s.adc.input_current_ma, (int)s.adc.otg_current_ma,
+        (int)s.adc.battery_current_ma, s.adc.ts_permille, s.raw.status0, s.raw.status1, s.raw.status2,
+        shp8808_charge_phase_name(s.decoded.charge), shp8808_ts_state_name(s.decoded.ts),
+        shp8808_mppt_state_name(s.decoded.mppt), jb(s.decoded.ibus_reg), jb(s.decoded.vindpm), jb(s.decoded.pg),
+        jb(s.decoded.vbus_present), jb(s.decoded.vbus_ov), jb(s.decoded.vbat_ov), jb(s.decoded.il_clamp),
+        jb(s.decoded.reverse), jb(s.decoded.sync), jb(s.decoded.otg_ov), jb(s.decoded.otg_uv),
+        jb(s.decoded.safety_timer), jb(s.charge_en), jb(s.hiz), jb(s.reverse_en), jb(s.mppt_en), jb(s.pfm), jb(s.ts_en),
+        jb(s.jeita_en), s.charge.fb_voltage_mv, (unsigned long)s.charge.charge_current_ma,
+        (unsigned long)s.charge.input_current_ma, s.charge.vindpm_ref_mv, (unsigned long)s.charge.precharge_current_ma,
+        (unsigned long)s.charge.termination_current_ma, jb(s.charge.enable_precharge), jb(s.charge.enable_termination),
+        jb(s.charge.enable_float), (unsigned long)s.reverse.vbus_mv, (unsigned long)s.reverse.ibus_ma,
+        jb(s.reverse.fb_pin_enabled), (unsigned)s.mppt.perturb, (unsigned)s.mppt.full_sweep, (unsigned)s.mppt.step,
+        s.safety_timer, jb(s.safety_en), s.precharge_timer, jb(s.precharge_timer_en), s.vbat_lowv, s.vrechg, s.vfloat,
+        jb(s.pins.ibus_pin_enabled), jb(s.pins.ibat_pin_enabled), jb(s.pins.otg_fb_pin_enabled), s.latch0, s.latch1,
+        s.latch2);
+    if (n < 0 || (uint32_t)n >= cap)
+        return 0;
+    for (i = 0U; i < s.log_count; ++i) {
+        int m = snprintf(buf + n, cap - (uint32_t)n, "%s{\"t\":%lu,\"kind\":%u,\"bits\":%u}", i == 0U ? "" : ",",
+                         (unsigned long)s.log[i].t_ms, s.log[i].kind, s.log[i].bits);
+        if (m < 0 || (uint32_t)m >= cap - (uint32_t)n)
+            break;
+        n += m;
+    }
+    if ((uint32_t)n + 3U < cap) {
+        buf[n++] = ']';
+        buf[n++] = '}';
+        buf[n] = '\0';
+    }
+    return n;
+}
+
 static int path_is(const char *path, const char *want)
 {
     while (*want != '\0') {
@@ -247,6 +303,9 @@ static void http_route(NX_TCP_SOCKET *socket, const char *req, uint32_t req_len)
         else if (path_is(path, "/api/bq25756")) {
             json_len = bq_json_fill(json_buf, sizeof(json_buf));
             (void)http_reply(socket, "200 OK", "application/json", (const uint8_t *)json_buf, (uint32_t)json_len);
+        } else if (path_is(path, "/api/shp8808")) {
+            json_len = shp_json_fill(json_buf, sizeof(json_buf));
+            (void)http_reply(socket, "200 OK", "application/json", (const uint8_t *)json_buf, (uint32_t)json_len);
         } else {
             (void)http_reply(socket, "404 Not Found", "text/plain; charset=utf-8", (const uint8_t *)"not found", 9U);
         }
@@ -255,6 +314,13 @@ static void http_route(NX_TCP_SOCKET *socket, const char *req, uint32_t req_len)
 
     if (req[0] == 'P' && path_is(path, "/api/bq25756")) {
         if (body != 0 && power_bq_command(body, blen) == 0)
+            (void)http_reply(socket, "200 OK", "application/json", ok, sizeof(ok) - 1U);
+        else
+            (void)http_reply(socket, "400 Bad Request", "application/json", bad, sizeof(bad) - 1U);
+        return;
+    }
+    if (req[0] == 'P' && path_is(path, "/api/shp8808")) {
+        if (body != 0 && power_shp_command(body, blen) == 0)
             (void)http_reply(socket, "200 OK", "application/json", ok, sizeof(ok) - 1U);
         else
             (void)http_reply(socket, "400 Bad Request", "application/json", bad, sizeof(bad) - 1U);
